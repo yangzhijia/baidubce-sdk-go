@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"path"
 	"strconv"
 	"strings"
 	"testing"
@@ -13,6 +14,12 @@ import (
 func TestGetURL(t *testing.T) {
 	expected := "http://bos.cn-n1.baidubce.com/v1/example/测试"
 	url := GetURL("", "bos.cn-n1.baidubce.com", "v1/example/测试", nil)
+
+	if url != expected {
+		t.Error(FormatTest("GetURL", url, expected))
+	}
+
+	url = GetURL("", "bos.cn-n1.baidubce.com", "/v1/example/测试", nil)
 
 	if url != expected {
 		t.Error(FormatTest("GetURL", url, expected))
@@ -71,11 +78,35 @@ func TestGetMD5(t *testing.T) {
 	if result != expected {
 		t.Error(FormatTest("GetMD5", result, expected))
 	}
+
+	result = GetMD5([]byte("baidubce-sdk-go"), false)
+
+	if result != expected {
+		t.Error(FormatTest("GetMD5", result, expected))
+	}
+
+	result = GetMD5(strings.NewReader("baidubce-sdk-go"), false)
+
+	if result != expected {
+		t.Error(FormatTest("GetMD5", result, expected))
+	}
 }
 
 func TestGetSha256(t *testing.T) {
 	expected := "b39aa8e24bcfc4b20c77f7ab36021e5c23cce79df034279ca9991e0472368b89"
 	result := GetSha256("baidubce-sdk-go")
+
+	if result != expected {
+		t.Error(FormatTest("GetSha256", result, expected))
+	}
+
+	result = GetSha256([]byte("baidubce-sdk-go"))
+
+	if result != expected {
+		t.Error(FormatTest("GetSha256", result, expected))
+	}
+
+	result = GetSha256(strings.NewReader("baidubce-sdk-go"))
 
 	if result != expected {
 		t.Error(FormatTest("GetSha256", result, expected))
@@ -189,6 +220,20 @@ func TestGetMapKey(t *testing.T) {
 	if result != expected {
 		t.Error(FormatTest("GetMapKey", result, expected))
 	}
+
+	expected = ""
+	result = GetMapKey(m, "age", true)
+
+	if result != expected {
+		t.Error(FormatTest("GetMapKey", result, expected))
+	}
+
+	expected = ""
+	result = GetMapKey(m, "age", false)
+
+	if result != expected {
+		t.Error(FormatTest("GetMapKey", result, expected))
+	}
 }
 
 func TestGetMapValue(t *testing.T) {
@@ -257,16 +302,37 @@ func TestHostToURL(t *testing.T) {
 	if url != expected {
 		t.Error(FormatTest("HostToURL", url, expected))
 	}
+
+	host = "bj.bcebos.com"
+	url = HostToURL(host, "")
+
+	if url != expected {
+		t.Error(FormatTest("HostToURL", url, expected))
+	}
+
+	host = "http://bj.bcebos.com"
+	url = HostToURL(host, "")
+
+	if url != expected {
+		t.Error(FormatTest("HostToURL", url, expected))
+	}
 }
 
 func TestToCanonicalQueryString(t *testing.T) {
-	const expected = "text10=test&text1=%E6%B5%8B%E8%AF%95&text="
+	expected := ""
+	encodedQueryString := ToCanonicalQueryString(nil)
+
+	if encodedQueryString != expected {
+		t.Error(FormatTest("ToCanonicalQueryString", encodedQueryString, expected))
+	}
+
+	expected = "text10=test&text1=%E6%B5%8B%E8%AF%95&text="
 	params := map[string]string{
 		"text":   "",
 		"text1":  "测试",
 		"text10": "test",
 	}
-	encodedQueryString := ToCanonicalQueryString(params)
+	encodedQueryString = ToCanonicalQueryString(params)
 
 	if encodedQueryString != expected {
 		t.Error(FormatTest("ToCanonicalQueryString", encodedQueryString, expected))
@@ -282,7 +348,15 @@ func TestToCanonicalHeaderString(t *testing.T) {
 		"x-bce-date:2015-04-27T08%3A23%3A49Z",
 	}, "\n")
 
-	canonicalHeader := ToCanonicalHeaderString(getHeaders())
+	header := map[string]string{
+		"Host":           "bj.bcebos.com",
+		"Content-Type":   "text/plain",
+		"Content-Length": "8",
+		"Content-Md5":    "0a52730597fb4ffa01fc117d9e71e3a9",
+		"x-bce-date":     "2015-04-27T08:23:49Z",
+	}
+
+	canonicalHeader := ToCanonicalHeaderString(header)
 
 	if canonicalHeader != expected {
 		t.Error(FormatTest("ToCanonicalHeaderString", canonicalHeader, expected))
@@ -331,18 +405,45 @@ func TestMapKeyToLower(t *testing.T) {
 }
 
 func TestToMap(t *testing.T) {
+	expected := "guoyao:10"
+
+	str := "{\"Name\": \"guoyao\", \"Age\": \"10\", \"Gender\": \"male\"}"
+	m, err := ToMap(str, "Name", "Age")
+
+	if err != nil {
+		t.Error(FormatTest("ToMap", err.Error(), "nil"))
+	} else {
+		result := fmt.Sprintf("%s:%v", m["Name"], m["Age"])
+
+		if result != expected {
+			t.Error(FormatTest("ToMap", result, expected))
+		}
+	}
+
+	byteArray := []byte(str)
+	m, err = ToMap(byteArray, "Name", "Age")
+
+	if err != nil {
+		t.Error(FormatTest("ToMap", err.Error(), "nil"))
+	} else {
+		result := fmt.Sprintf("%s:%v", m["Name"], m["Age"])
+
+		if result != expected {
+			t.Error(FormatTest("ToMap", result, expected))
+		}
+	}
+
 	p := struct {
 		Name   string
 		Age    int
 		Gender string
 	}{"guoyao", 10, "male"}
 
-	m, err := ToMap(p, "Name", "Age")
+	m, err = ToMap(p, "Name", "Age")
 
 	if err != nil {
 		t.Error(FormatTest("ToMap", err.Error(), "nil"))
 	} else {
-		expected := "guoyao:10"
 		result := fmt.Sprintf("%s:%v", m["Name"], m["Age"])
 
 		if result != expected {
@@ -358,7 +459,20 @@ func TestToJson(t *testing.T) {
 		Gender string `json:"gender"`
 	}{"guoyao", 10, "male"}
 
-	byteArray, err := ToJson(p, "name", "age")
+	byteArray, err := ToJson(p)
+
+	if err != nil {
+		t.Error(FormatTest("ToMap", err.Error(), "nil"))
+	} else {
+		expected := "{\"name\":\"guoyao\",\"age\":10,\"gender\":\"male\"}"
+		result := string(byteArray)
+
+		if result != expected {
+			t.Error(FormatTest("ToMap", result, expected))
+		}
+	}
+
+	byteArray, err = ToJson(p, "name", "age")
 
 	if err != nil {
 		t.Error(FormatTest("ToMap", err.Error(), "nil"))
@@ -375,6 +489,13 @@ func TestToJson(t *testing.T) {
 func TestCheckFileExists(t *testing.T) {
 	expected := true
 	result := CheckFileExists("util_test.go")
+
+	if result != expected {
+		t.Error(FormatTest("CheckFileExists", strconv.FormatBool(result), strconv.FormatBool(expected)))
+	}
+
+	expected = false
+	result = CheckFileExists("util_test_2.go")
 
 	if result != expected {
 		t.Error(FormatTest("CheckFileExists", strconv.FormatBool(result), strconv.FormatBool(expected)))
@@ -423,6 +544,32 @@ func TestTempFile(t *testing.T) {
 			t.Error(FormatTest("TempFile", string(byteArray), content))
 		}
 	}
+
+	pwd, err := os.Getwd()
+
+	if err != nil {
+		t.Error(FormatTest("TempFile", err.Error(), "nil"))
+	} else {
+		content = "world"
+		f2, err := TempFile([]byte(content), path.Join(pwd, "guoyao"), "temp")
+
+		defer func() {
+			f2.Close()
+			os.Remove(f2.Name())
+		}()
+
+		if err != nil {
+			t.Error(FormatTest("TempFile", err.Error(), "nil"))
+		} else {
+			byteArray, err := ioutil.ReadAll(f2)
+
+			if err != nil {
+				t.Error(FormatTest("TempFile", err.Error(), "nil"))
+			} else if string(byteArray) != content {
+				t.Error(FormatTest("TempFile", string(byteArray), content))
+			}
+		}
+	}
 }
 
 func TestHomeDir(t *testing.T) {
@@ -455,12 +602,6 @@ func TestDirWindows(t *testing.T) {
 	}
 }
 
-/*
-func TestDebug(t *testing.T) {
-	Debug("title", "detail")
-}
-*/
-
 func TestFormatTest(t *testing.T) {
 	expected := "funcName failed. Got a, expected b"
 	str := FormatTest("funcName", "a", "b")
@@ -468,16 +609,4 @@ func TestFormatTest(t *testing.T) {
 	if str != expected {
 		t.Error(FormatTest("FormatTest", str, expected))
 	}
-}
-
-func getHeaders() map[string]string {
-	header := map[string]string{
-		"Host":           "bj.bcebos.com",
-		"Content-Type":   "text/plain",
-		"Content-Length": "8",
-		"Content-Md5":    "0a52730597fb4ffa01fc117d9e71e3a9",
-		"x-bce-date":     "2015-04-27T08:23:49Z",
-	}
-
-	return header
 }
